@@ -12,19 +12,37 @@ app.get('/accounts', async (req, res) => {
   }
 });
 
-app.get('/accounts/maiorSaldo', async (req, res) => {
+app.post('/accounts/lowProfile', async (req, res) => {
   try {
-    const maiorSaldo = await accountsModel.aggregate([
-      { $match: { $and: { agencia: 10 } } },
-      { $group: { _id: null, total: { $max: '$balance' } } },
-    ]);
-    console.log(maiorSaldo);
-
-    res.send(maiorSaldo);
+    const { quantidade } = req.body;
+    //console.log(quantidade);
+    const accounts = await accountsModel
+      .find({})
+      .sort({ balance: 1 })
+      .limit(quantidade);
+    res.send(accounts);
   } catch (error) {
-    res.status(500).send(error);
+    res.status(500).send(err);
   }
 });
+/*
+ * Código utilizado para testar a seleção de agencia
+ *
+ * app.get('/accounts/maiorSaldo', async (req, res) => {
+ *   try {
+ *     const maiorSaldo = await accountsModel.aggregate([
+ *       { $match: { $and: { agencia: 10 } } },
+ *       { $group: { _id: null, total: { $max: '$balance' } } },
+ *     ]);
+ *     console.log(maiorSaldo);*
+ *
+ *     res.send(maiorSaldo);
+ *   } catch (error) {
+ *     res.status(500).send(error);
+ *   }
+ * });
+ *
+ */
 
 app.post('/accounts/consultaConta/', async (req, res) => {
   //console.log('Consulta de Conta');
@@ -68,11 +86,30 @@ app.post('/accounts/maiorSaldoPorAgencia/', async (req, res) => {
   try {
     const { agencia } = req.body;
     console.log(agencia);
-    const accounts = await accountsModel.aggregate([
+    const bestAccounts = await accountsModel.aggregate([
       { $match: { agencia: agencia } },
       { $sort: { balance: -1 } },
       { $limit: 1 },
     ]);
+    console.log(bestAccounts);
+
+    res.send(bestAccounts);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+});
+
+app.post('/accounts/maiorSaldoBanco/', async (req, res) => {
+  //console.log('Consulta de Conta');
+  try {
+    const { quantidade } = req.body;
+    //console.log(quantidade);
+    const accounts = await accountsModel
+      .find({})
+      .sort({ balance: -1 })
+      .sort({ name: 1 })
+      .limit(quantidade);
+
     console.log(accounts);
 
     res.send(accounts);
@@ -108,6 +145,7 @@ app.post('/accounts/depositoConta/', async (req, res) => {
 
     let accounts = await accountsModel.findOneAndUpdate(
       { $and: [{ agencia: agencia }, { conta: conta }] },
+      //{ $exists: true },
       { $inc: { balance: deposito } },
       { new: true }
     );
@@ -130,9 +168,10 @@ app.post('/accounts/saqueConta/', async (req, res) => {
     let accounts = await accountsModel.findOneAndUpdate(
       { $and: [{ agencia: agencia }, { conta: conta }] },
 
-      { $inc: { balance: -saque } },
+      { $inc: { balance: -saque - 1 } },
       { new: true }
     );
+
     console.log(accounts);
     res.send(accounts);
   } catch (error) {
@@ -147,20 +186,58 @@ app.delete('/accounts/deleteConta/', async (req, res) => {
     console.log(agencia);
     console.log(conta);
 
-    let accounts = await accountsModel.findOneAndDelete(
-      { $and: [{ agencia: agencia }, { conta: conta }] }
-      //{ $match: { agencia: agencia } },
-      //{ $group: { _id: null, count: { $count: '$conta' } } }
-      //{ $count: _id }
-      //{ $inc: { balance: -saque } },
-      //{ new: true }
-    );
+    let accounts = await accountsModel.findOneAndDelete({
+      $and: [{ agencia: agencia }, { conta: conta }],
+    });
+    const contasPorAgencia = await accountsModel.aggregate([
+      { $match: { agencia: agencia } },
+      { $count: 'total_contas' },
+    ]);
+    console.log(contasPorAgencia);
+
+    res.send(contasPorAgencia);
     //console.log(conta);
+    //console.log(accounts);
+    //res.send(accounts);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+});
+
+app.post('/accounts/transfereAgencia99/', async (req, res) => {
+  //console.log('Consulta de Conta');
+  try {
+    //const { agencia } = req.body;
+    //console.log(agencia);
+    const accounts = await accountsModel.find({}).sort({ balance: -1 });
+    //.limit(1);
+
     console.log(accounts);
+
     res.send(accounts);
   } catch (error) {
     res.status(500).send(error);
   }
 });
+/*
+ * Código utilizado para testar a contagem de contas
+ *
+ * app.post('/accounts/contasPorAgencia/', async (req, res) => {
+ * //console.log('Consulta de Conta');
+ *  try {
+ *   const { agencia } = req.body;
+ *   console.log(agencia);
+ *   const contasPorAgencia = await accountsModel.aggregate([
+ *     { $match: { agencia: agencia } },
+ *     { $count: 'total_contas' },
+ *   ]);
+ *   console.log(contasPorAgencia);
+ *
+ *   res.send(contasPorAgencia);
+ * } catch (error) {
+ *   res.status(500).send(error);
+ * }
+ * });
+ */
 
 export { app as accountsRouter };
